@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Anime Hangman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>🎌 Anime Hangman</h1>
+      <div class="stats">
+        <span id="attempts">Attempts: 0</span>
+        <span id="wrong-letters" aria-live="polite"></span>
+      </div>
+    </header>
+
+    <section class="stage">
+      <pre id="hangman-stage" aria-hidden="true"></pre>
+    </section>
+
+    <section class="word-area" aria-live="polite">
+      <div id="word"></div>
+      <p id="message" role="status">Guess the anime title!</p>
+    </section>
+
+    <section class="controls">
+      <div id="keyboard" class="keyboard" aria-label="On-screen keyboard"></div>
+      <div class="actions">
+        <button id="reset-btn" class="btn">🔄 New Game</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <small>Tip: you can also type on your physical keyboard.</small>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
