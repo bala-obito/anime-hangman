@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Anime Hangman - Choose Mode</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg1: #0f1226;
+      --bg2: #1b1f44;
+      --primary: #e94560;
+      --accent: #0f3460;
+      --text: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at top left, var(--bg2), var(--bg1));
+      font-family: "Poppins", sans-serif;
+      color: var(--text);
+    }
+    .container {
+      text-align: center;
+      background: rgba(255,255,255,0.06);
+      padding: 40px;
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      width: min(90%, 500px);
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    p {
+      color: #bbb;
+      margin-bottom: 30px;
+    }
+    .btn {
+      display: inline-block;
+      margin: 10px;
+      padding: 14px 28px;
+      font-size: 1.1rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.3s ease;
+      color: white;
+      font-weight: bold;
+    }
+    .btn-normal {
+      background: var(--accent);
+    }
+    .btn-advanced {
+      background: var(--primary);
+    }
+    .btn:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎌 Anime Hangman</h1>
+    <p>Choose your game mode</p>
+    <a href="normal.html"><button class="btn btn-normal">Normal Mode</button></a>
+    <a href="advanced.html"><button class="btn btn-advanced">Advanced Mode</button></a>
+  </div>
+</body>
+</html>

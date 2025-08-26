@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Anime Hangman Advanced</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg1: #0f1226;
+      --bg2: #1b1f44;
+      --primary: #e94560;
+      --accent: #0f3460;
+      --text: #ffffff;
+      --muted: #b9c1d9;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      font-family: "Poppins", sans-serif;
+      background: radial-gradient(circle at top left, var(--bg2), var(--bg1));
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .app {
+      width: min(900px, 92vw);
+      background: rgba(255,255,255,0.05);
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    h1 { margin: 0; font-weight: 700; }
+    .stats { color: var(--muted); }
+    .stage { text-align: center; margin: 15px 0; }
+    #hangman-stage {
+      font-family: monospace;
+      white-space: pre;
+      font-size: 14px;
+      line-height: 1.1;
+    }
+    .word-area { text-align: center; margin: 15px 0; }
+    #word {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+    .letter {
+      border-bottom: 2px solid rgba(255,255,255,0.2);
+      min-width: 24px;
+      text-align: center;
+    }
+    .letter.space { border-bottom: none; }
+    #message { color: var(--muted); margin-top: 5px; }
+    .keyboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(30px, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .key {
+      background: var(--primary);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      padding: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .key:disabled { background: #444; cursor: not-allowed; }
+    .actions { text-align: center; margin-top: 10px; }
+    .btn {
+      background: var(--accent);
+      border: none;
+      padding: 8px 14px;
+      margin: 0 5px;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+    }
+    .hint {
+      margin-top: 12px;
+      text-align: center;
+      color: #ffd991;
+      font-weight: 600;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>🎌 Anime Hangman (Advanced)</h1>
+      <a href="index.html"><button class="btn">Back to Menu</button></a>
+      <div class="stats">
+        <span id="attempts">Attempts: 0</span>
+        <span id="wrong-letters"></span>
+      </div>
+    </header>
+
+    <section class="stage">
+      <pre id="hangman-stage"></pre>
+    </section>
+
+    <section class="word-area">
+      <div id="word"></div>
+      <p id="message">Guess the anime title!</p>
+    </section>
+
+    <section class="controls">
+      <div id="keyboard" class="keyboard"></div>
+      <div class="actions">
+        <button id="hint-btn" class="btn">💡 Hint</button>
+        <button id="reset-btn" class="btn">🔄 New Game</button>
+      </div>
+      <p id="hint" class="hint"></p>
+    </section>
+
+    <footer class="footer">
+      <small>Press Ctrl + H for hint • Powered by Jikan API (MyAnimeList)</small>
+    </footer>
+  </main>
+
+  <script>
+    // ==== API URL ====
+    const API_URL = "https://api.jikan.moe/v4/random/anime";
+
+    // ==== Hangman Stages ====
+    const STAGES = [
+      ` +---+\n |   |\n     |\n     |\n     |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n     |\n     |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n |   |\n     |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n/|   |\n     |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n/|\\  |\n     |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n/|\\  |\n/    |\n     |\n=========`,
+      ` +---+\n |   |\n O   |\n/|\\  |\n/ \\  |\n     |\n=========`
+    ];
+
+    // ==== Fallback Titles ====
+    const FALLBACK = [
+      { title: "Naruto", hint: "Ninja boy dreams of being Hokage." },
+      { title: "One Piece", hint: "Pirate adventure chasing treasure." },
+      { title: "Attack on Titan", hint: "Humanity vs giants behind walls." },
+      { title: "Death Note", hint: "Notebook that controls fate." },
+      { title: "Demon Slayer", hint: "Boy protects his demon-turned sister." }
+    ];
+
+    // ==== UI Elements ====
+    const wordEl = document.getElementById("word");
+    const stageEl = document.getElementById("hangman-stage");
+    const msgEl = document.getElementById("message");
+    const kbEl = document.getElementById("keyboard");
+    const resetBtn = document.getElementById("reset-btn");
+    const hintBtn = document.getElementById("hint-btn");
+    const hintEl = document.getElementById("hint");
+    const attemptsEl = document.getElementById("attempts");
+    const wrongLettersEl = document.getElementById("wrong-letters");
+
+    let selected = null;
+    let display = [];
+    let wrongGuesses = 0;
+    let guessed = new Set();
+    let hintShown = false;
+
+    // === Fetch Random Anime from Jikan ===
+    async function fetchRandomAnime() {
+      const response = await fetch(API_URL);
+      if (!response.ok) throw new Error("API error");
+      const json = await response.json();
+      const data = json.data;
+      const title = data.title_english || data.title || data.title_japanese;
+      const hint = data.synopsis || "No hint available.";
+      return { title, hint };
+    }
+
+    async function pickAnime() {
+      try {
+        const anime = await fetchRandomAnime();
+        return { title: anime.title, hint: truncate(anime.hint, 160) };
+      } catch {
+        console.warn("Jikan failed, using fallback");
+        return FALLBACK[Math.floor(Math.random() * FALLBACK.length)];
+      }
+    }
+
+    function truncate(s, n) {
+      return s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, "") + "...";
+    }
+
+    function maskTitle(title) {
+      return [...title].map(ch => (/[A-Za-z0-9]/.test(ch) ? "_" : ch));
+    }
+
+    function renderWord() {
+      wordEl.innerHTML = "";
+      display.forEach(ch => {
+        const span = document.createElement("span");
+        span.className = "letter" + (ch === " " ? " space" : "");
+        span.textContent = ch;
+        wordEl.appendChild(span);
+      });
+    }
+
+    function renderStage() {
+      stageEl.textContent = STAGES[wrongGuesses];
+      attemptsEl.textContent = `Attempts: ${STAGES.length - 1 - wrongGuesses}`;
+    }
+
+    function renderWrongLetters() {
+      const wrong = [...guessed].filter(l => !selected.title.toLowerCase().includes(l));
+      wrongLettersEl.textContent = wrong.length ? `Wrong: ${wrong.join(", ")}` : "";
+    }
+
+    function buildKeyboard() {
+      kbEl.innerHTML = "";
+      for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i).toLowerCase();
+        const btn = document.createElement("button");
+        btn.className = "key";
+        btn.textContent = letter;
+        btn.dataset.letter = letter;
+        btn.addEventListener("click", () => handleGuess(letter));
+        kbEl.appendChild(btn);
+      }
+    }
+
+    function disableAll() {
+      kbEl.querySelectorAll("button").forEach(b => (b.disabled = true));
+    }
+
+    function disableLetter(letter) {
+      const btn = kbEl.querySelector(`button[data-letter="${letter}"]`);
+      if (btn) btn.disabled = true;
+    }
+
+    function handleGuess(letter) {
+      if (guessed.has(letter)) return;
+      guessed.add(letter);
+      disableLetter(letter);
+
+      const answer = selected.title.toLowerCase();
+      if (answer.includes(letter)) {
+        [...answer].forEach((ch, i) => {
+          if (ch === letter) display[i] = selected.title[i];
+        });
+        renderWord();
+        if (!display.includes("_")) {
+          msgEl.textContent = `🎉 You win! Title: ${selected.title}`;
+          disableAll();
+        }
+      } else {
+        wrongGuesses++;
+        renderStage();
+        renderWrongLetters();
+        if (wrongGuesses >= STAGES.length - 1) {
+          display = [...selected.title];
+          renderWord();
+          msgEl.textContent = `💀 You lost! Title: ${selected.title}`;
+          disableAll();
+        }
+      }
+    }
+
+    async function newGame() {
+      msgEl.textContent = "Fetching random anime...";
+      hintEl.textContent = "";
+      wrongLettersEl.textContent = "";
+      stageEl.textContent = STAGES[0];
+
+      selected = await pickAnime();
+      display = maskTitle(selected.title);
+      wrongGuesses = 0;
+      guessed = new Set();
+      hintShown = false;
+
+      msgEl.textContent = "Guess the anime! (Press H for hint)";
+      buildKeyboard();
+      renderWord();
+      renderStage();
+      renderWrongLetters();
+    }
+
+    function showHint() {
+      if (hintShown) return;
+      hintShown = true;
+      hintEl.textContent = `Hint: ${selected.hint}`;
+    }
+
+    // === Controls ===
+window.addEventListener("keydown", e => {
+  const key = e.key.toLowerCase();
+
+  // Normal alphabet guess
+  if (/^[a-z]$/.test(key) && !e.ctrlKey) {
+    handleGuess(key);
+  }
+
+  // Ctrl + H = show hint
+  if (e.ctrlKey && key === "h") {
+    e.preventDefault(); // stop browser's default replace shortcut
+    showHint();
+  }
+});
+
+    hintBtn.addEventListener("click", showHint);
+    resetBtn.addEventListener("click", newGame);
+
+    // Start
+    newGame();
+  </script>
+</body>
+</html>
