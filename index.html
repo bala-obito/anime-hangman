@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Anime Hangman — 言葉当て</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="A Japanese ink-styled hangman game. Guess anime titles before the torii gate is complete." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   Design tokens
+========================================================= */
+:root{
+  --ink-900:#0e0f1a;
+  --ink-800:#161829;
+  --ink-700:#20233a;
+  --paper:#f3ede0;
+  --paper-dim:#d9d0bd;
+  --sakura:#ef6f8e;
+  --sakura-soft:#f3a8bc;
+  --gold:#d9ad4f;
+  --jade:#59b892;
+  --line:rgba(243,237,224,0.12);
+
+  --display:'Yuji Syuku', serif;
+  --body:'Zen Kaku Gothic New', system-ui, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, monospace;
+
+  --radius:16px;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; }
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; margin:0; }
+
+body{
+  background:
+    radial-gradient(1100px 700px at 12% -10%, #262a49 0%, transparent 60%),
+    radial-gradient(900px 700px at 100% 110%, #2a1830 0%, transparent 55%),
+    var(--ink-900);
+  color:var(--paper);
+  font-family:var(--body);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  padding:28px 16px 60px;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* faint ink-wash texture overlay */
+.ink-wash{
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(239,111,142,0.05), transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(217,173,79,0.06), transparent 45%);
+  mix-blend-mode:screen;
+}
+
+/* =========================================================
+   Layout shell
+========================================================= */
+.app{
+  position:relative; z-index:1;
+  width:min(980px, 100%);
+  display:flex; flex-direction:column; gap:18px;
+}
+
+/* ===== Header ===== */
+.hdr{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  flex-wrap:wrap; gap:14px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:16px;
+}
+.eyebrow{
+  margin:0 0 4px; font-family:var(--mono); font-size:11px;
+  letter-spacing:.14em; color:var(--sakura-soft); text-transform:uppercase;
+}
+.hdr-title h1{
+  margin:0; font-family:var(--display); font-weight:400;
+  font-size:clamp(28px,5vw,42px); letter-spacing:.02em;
+  display:flex; align-items:baseline; gap:8px;
+}
+.hdr-brush{ color:var(--gold); font-size:.7em; }
+
+.hdr-right{ display:flex; align-items:center; gap:10px; }
+
+.mode-switch{
+  display:flex; background:var(--ink-800); border:1px solid var(--line);
+  border-radius:999px; padding:4px; gap:2px;
+}
+.mode-btn{
+  border:none; background:transparent; color:var(--paper-dim);
+  font-family:var(--body); font-weight:500; font-size:13px;
+  padding:8px 14px; border-radius:999px; cursor:pointer;
+  display:flex; align-items:center; gap:6px;
+  transition:background .2s var(--ease), color .2s var(--ease);
+}
+.mode-kanji{ font-family:var(--display); font-size:14px; color:var(--gold); }
+.mode-btn.active{ background:var(--sakura); color:#1c0a10; }
+.mode-btn.active .mode-kanji{ color:#1c0a10; }
+.mode-btn:not(.active):hover{ background:var(--ink-700); color:var(--paper); }
+
+.icon-btn{
+  width:38px; height:38px; border-radius:50%;
+  border:1px solid var(--line); background:var(--ink-800);
+  color:var(--paper-dim); display:grid; place-items:center; cursor:pointer;
+}
+.icon-btn svg{ width:18px; height:18px; }
+.icon-btn[aria-pressed="false"]{ color:var(--paper-dim); opacity:.4; }
+.icon-btn:hover{ border-color:var(--sakura-soft); color:var(--sakura-soft); }
+
+/* ===== Stat bar ===== */
+.statbar{
+  display:flex; gap:26px; flex-wrap:wrap; align-items:center;
+  background:var(--ink-800); border:1px solid var(--line);
+  border-radius:var(--radius); padding:14px 20px;
+}
+.stat{ display:flex; flex-direction:column; gap:2px; min-width:56px; }
+.stat-num{ font-family:var(--mono); font-weight:700; font-size:20px; color:var(--paper); }
+.stat-label{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--paper-dim); }
+.stat-life{ margin-left:auto; align-items:flex-start; }
+.life-dots{ display:flex; gap:5px; margin-top:4px; }
+.life-dots span{
+  width:9px; height:9px; border-radius:50%; background:var(--jade);
+  box-shadow:0 0 6px rgba(89,184,146,.7);
+  transition:background .2s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
+}
+.life-dots span.spent{
+  background:#3a3d52; box-shadow:none; transform:scale(.7);
+}
+
+/* ===== Game grid ===== */
+.game-grid{
+  display:grid; grid-template-columns:300px 1fr; gap:18px;
+}
+@media (max-width:760px){ .game-grid{ grid-template-columns:1fr; } }
+
+.stage-card, .play-card{
+  background:linear-gradient(180deg, var(--ink-800), var(--ink-700));
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px;
+}
+.stage-card{ display:flex; flex-direction:column; align-items:center; text-align:center; }
+.stage-caption{ margin:0 0 6px; font-size:12px; color:var(--paper-dim); }
+
+/* Torii SVG */
+.torii{ width:100%; max-width:230px; }
+.torii .ground{ stroke:var(--paper-dim); stroke-width:2; opacity:.35; }
+.torii .stroke{
+  fill:none; stroke:var(--sakura); stroke-width:7; stroke-linecap:round;
+  stroke-dasharray:1 1; stroke-dashoffset:1;
+  filter:drop-shadow(0 0 6px rgba(239,111,142,.0));
+  transition:stroke-dashoffset .55s var(--ease), filter .55s var(--ease), stroke .4s var(--ease);
+}
+.torii .stroke.drawn{
+  stroke-dashoffset:0;
+  filter:drop-shadow(0 0 7px rgba(239,111,142,.55));
+}
+.torii .bloom{
+  stroke:var(--gold); stroke-width:0; fill:var(--gold); r:0;
+  transition:r .5s var(--ease), fill .3s;
+}
+.torii .bloom.drawn{ r:120; fill:rgba(217,84,84,.16); }
+.torii .stroke.drawn.final-hit{ stroke:#d95454; }
+
+.hint-panel{ margin-top:16px; width:100%; }
+.hint-btn{
+  width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+  background:transparent; border:1px dashed var(--gold); color:var(--gold);
+  border-radius:10px; padding:9px; font-family:var(--body); font-weight:500;
+  font-size:13px; cursor:pointer; transition:background .2s var(--ease);
+}
+.hint-btn:hover{ background:rgba(217,173,79,.1); }
+.hint-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.hint-text{
+  margin:10px 0 0; font-size:12.5px; line-height:1.5; color:var(--paper-dim);
+  text-align:left; min-height:0;
+}
+
+/* ===== Play card ===== */
+.msg{
+  margin:0 0 16px; text-align:center; font-weight:500; font-size:15px;
+  min-height:22px; color:var(--paper);
+}
+.msg.win{ color:var(--jade); }
+.msg.lose{ color:var(--sakura); }
+
+.word-wrap{ display:flex; justify-content:center; margin-bottom:10px; }
+.word{
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+  font-family:var(--mono); font-size:clamp(22px,4vw,32px); font-weight:700;
+}
+.letter{
+  min-width:26px; text-align:center; padding-bottom:4px;
+  border-bottom:3px solid var(--line); color:var(--paper);
+  transition:border-color .3s var(--ease), transform .3s var(--ease);
+}
+.letter.space{ border-bottom:none; min-width:14px; }
+.letter.revealed{
+  border-color:var(--sakura); animation:pop .35s var(--ease);
+}
+@keyframes pop{ 0%{ transform:scale(.5); opacity:0;} 100%{ transform:scale(1); opacity:1;} }
+
+.wrong-row{
+  min-height:20px; text-align:center; font-family:var(--mono); font-size:12px;
+  color:var(--sakura-soft); letter-spacing:.05em; margin-bottom:14px;
+}
+
+.keyboard{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(32px,1fr));
+  gap:7px; margin-bottom:18px;
+}
+.key{
+  background:var(--ink-800); border:1px solid var(--line); color:var(--paper);
+  border-radius:8px; padding:10px 0; font-family:var(--mono); font-weight:600;
+  font-size:13px; cursor:pointer; text-transform:uppercase;
+  transition:background .15s var(--ease), transform .1s var(--ease), border-color .15s var(--ease);
+}
+.key:hover:not(:disabled){ border-color:var(--sakura-soft); transform:translateY(-1px); }
+.key:active:not(:disabled){ transform:translateY(0); }
+.key.correct{ background:var(--jade); color:#08211a; border-color:var(--jade); }
+.key.wrong{ background:transparent; color:#5b5e73; border-color:var(--line); text-decoration:line-through; }
+.key:disabled{ cursor:not-allowed; }
+
+.actions{
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+}
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  border:none; border-radius:10px; padding:11px 18px;
+  font-family:var(--body); font-weight:700; font-size:13.5px; cursor:pointer;
+  transition:transform .15s var(--ease), box-shadow .2s var(--ease);
+}
+.btn-primary{ background:var(--sakura); color:#1c0a10; box-shadow:0 8px 18px rgba(239,111,142,.25); }
+.btn-primary:hover{ transform:translateY(-2px); box-shadow:0 12px 22px rgba(239,111,142,.35); }
+.kbd-tip{ font-size:11.5px; color:var(--paper-dim); font-family:var(--mono); }
+.kbd-tip kbd{
+  background:var(--ink-800); border:1px solid var(--line); border-radius:4px;
+  padding:1px 5px; font-family:var(--mono);
+}
+
+/* ===== Footer ===== */
+.ftr{
+  text-align:center; font-size:11.5px; color:var(--paper-dim); opacity:.7;
+  padding-top:6px;
+}
+.ftr .dot{ margin:0 6px; }
+
+/* ===== Sakura petal fall (win) ===== */
+.petals{ position:fixed; inset:0; pointer-events:none; z-index:50; overflow:hidden; }
+.petal{
+  position:absolute; top:-20px; font-size:18px; opacity:.9;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  to{ transform:translate(var(--dx), 105vh) rotate(var(--rot)); opacity:.2; }
+}
+
+/* ===== Shake on wrong guess ===== */
+.shake{ animation:shake .4s var(--ease); }
+@keyframes shake{
+  10%,90%{ transform:translateX(-2px);} 20%,80%{ transform:translateX(4px);}
+  30%,50%,70%{ transform:translateX(-8px);} 40%,60%{ transform:translateX(8px);}
+}
+
+/* ===== Focus visibility ===== */
+:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+</style>
+</head>
+<body>
+
+<div class="ink-wash" aria-hidden="true"></div>
+
+<main class="app" id="app">
+
+  <!-- ===== Header ===== -->
+  <header class="hdr">
+    <div class="hdr-title">
+      <p class="eyebrow">言葉当て — WORD GUESSING GAME</p>
+      <h1>Anime Hangman<span class="hdr-brush">の</span></h1>
+    </div>
+
+    <div class="hdr-right">
+      <div class="mode-switch" role="tablist" aria-label="Game mode">
+        <button class="mode-btn active" data-mode="normal" role="tab" aria-selected="true">
+          <span class="mode-kanji">通</span> Normal
+        </button>
+        <button class="mode-btn" data-mode="advanced" role="tab" aria-selected="false">
+          <span class="mode-kanji">上</span> Live API
+        </button>
+      </div>
+      <button class="icon-btn" id="sound-toggle" title="Toggle sound" aria-pressed="true">
+        <svg viewBox="0 0 24 24" id="sound-on"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== Stats bar ===== -->
+  <section class="statbar" aria-label="Statistics">
+    <div class="stat"><span class="stat-num" id="stat-streak">0</span><span class="stat-label">Streak</span></div>
+    <div class="stat"><span class="stat-num" id="stat-best">0</span><span class="stat-label">Best</span></div>
+    <div class="stat"><span class="stat-num" id="stat-wins">0</span><span class="stat-label">Wins</span></div>
+    <div class="stat"><span class="stat-num" id="stat-games">0</span><span class="stat-label">Played</span></div>
+    <div class="stat stat-life">
+      <span class="stat-label">Remaining</span>
+      <div class="life-dots" id="life-dots"></div>
+    </div>
+  </section>
+
+  <!-- ===== Game grid ===== -->
+  <section class="game-grid">
+
+    <!-- Torii stage -->
+    <div class="stage-card">
+      <p class="stage-caption">Each miss draws the gate.</p>
+      <svg class="torii" viewBox="0 0 240 220" aria-hidden="true">
+        <!-- ground -->
+        <line x1="20" y1="200" x2="220" y2="200" class="ground"/>
+        <!-- 1 left pillar -->
+        <path id="s1" class="stroke" pathLength="1" d="M70 200 L70 40"/>
+        <!-- 2 right pillar -->
+        <path id="s2" class="stroke" pathLength="1" d="M170 200 L170 40"/>
+        <!-- 3 nuki (lower beam) -->
+        <path id="s3" class="stroke" pathLength="1" d="M62 120 L178 120"/>
+        <!-- 4 gakuzuka (center support) -->
+        <path id="s4" class="stroke" pathLength="1" d="M120 40 L120 70"/>
+        <!-- 5 shimaki (straight upper beam) -->
+        <path id="s5" class="stroke" pathLength="1" d="M58 40 L182 40"/>
+        <!-- 6 kasagi (curved top beam) -->
+        <path id="s6" class="stroke" pathLength="1" d="M35 30 Q120 5 205 30"/>
+        <!-- 7 final ink bloom (caught) -->
+        <circle id="s7" class="stroke bloom" cx="120" cy="120" r="4"/>
+      </svg>
+      <div class="hint-panel" id="hint-panel">
+        <button class="hint-btn" id="hint-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.05V17h6v-1.25c0-.85.4-1.55 1-2.05A7 7 0 0 0 12 2z"/></svg>
+          Reveal a hint
+        </button>
+        <p class="hint-text" id="hint-text"></p>
+      </div>
+    </div>
+
+    <!-- Word / keyboard -->
+    <div class="play-card">
+      <p class="msg" id="message" role="status" aria-live="polite">Loading a title…</p>
+
+      <div class="word-wrap">
+        <div class="word" id="word" aria-live="polite"></div>
+      </div>
+
+      <div class="wrong-row" id="wrong-letters" aria-live="polite"></div>
+
+      <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="reset-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17.65 6.35A8 8 0 1 0 19.9 13h-2.1a6 6 0 1 1-1.42-6.22L13 10h7V3l-2.35 3.35z"/></svg>
+          New Round
+        </button>
+        <span class="kbd-tip">Type letters · <kbd>Ctrl</kbd>+<kbd>H</kbd> for hint</span>
+      </div>
+    </div>
+
+  </section>
+
+  <footer class="ftr">
+    <span id="mode-caption">Normal mode — curated title bank.</span>
+    <span class="dot">·</span>
+    <span>Advanced mode pulls a live random title from the Jikan (MyAnimeList) API.</span>
+  </footer>
+</main>
+
+<div class="petals" id="petals" aria-hidden="true"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ====================== Word banks ====================== */
+  const NORMAL_BANK = [
+    { title: "naruto", hint: "A ninja boy dreams of becoming his village's leader." },
+    { title: "one piece", hint: "A crew of pirates sails in search of a legendary treasure." },
+    { title: "attack on titan", hint: "Humanity hides behind walls to survive giant threats." },
+    { title: "death note", hint: "A notebook lets its owner decide who dies." },
+    { title: "demon slayer", hint: "A boy hunts demons to save his transformed sister." },
+    { title: "jujutsu kaisen", hint: "Students battle cursed spirits born from human emotion." },
+    { title: "fullmetal alchemist", hint: "Two brothers seek a stone to restore their bodies." },
+    { title: "my hero academia", hint: "A powerless boy enrolls in a school for superheroes." },
+    { title: "bleach", hint: "A teenager gains the powers of a soul reaper." },
+    { title: "dragon ball", hint: "A monkey-tailed boy searches for wish-granting orbs." },
+    { title: "spy x family", hint: "A spy, an assassin, and a telepath form a fake family." },
+    { title: "chainsaw man", hint: "A devil hunter merges with his chainsaw dog-devil." },
+    { title: "hunter x hunter", hint: "A boy sits a dangerous exam to follow his father's path." },
+    { title: "code geass", hint: "An exiled prince gains a power that commands absolute obedience." },
+    { title: "cowboy bebop", hint: "Bounty hunters drift through space aboard a rickety ship." },
+    { title: "steins gate", hint: "A microwave and a phone start sending messages to the past." },
+    { title: "tokyo ghoul", hint: "A student becomes half of a flesh-eating creature after an attack." },
+    { title: "vinland saga", hint: "A young Viking seeks revenge against his father's killer." },
+    { title: "mob psycho 100", hint: "A psychic middle schooler tries to live a normal life." },
+    { title: "haikyuu", hint: "A short boy chases his dream on the volleyball court." }
+  ];
+
+  const FALLBACK = NORMAL_BANK.slice(0, 6);
+  const JIKAN_URL = "https://api.jikan.moe/v4/random/anime";
+
+  /* ====================== DOM refs ====================== */
+  const $ = (id) => document.getElementById(id);
+  const wordEl = $("word");
+  const msgEl = $("message");
+  const kbEl = $("keyboard");
+  const resetBtn = $("reset-btn");
+  const hintBtn = $("hint-btn");
+  const hintText = $("hint-text");
+  const lifeDots = $("life-dots");
+  const wrongRow = $("wrong-letters");
+  const soundToggle = $("sound-toggle");
+  const modeBtns = document.querySelectorAll(".mode-btn");
+  const modeCaption = $("mode-caption");
+  const playCard = document.querySelector(".play-card");
+  const petalsHost = $("petals");
+  const statStreak = $("stat-streak");
+  const statBest = $("stat-best");
+  const statWins = $("stat-wins");
+  const statGames = $("stat-games");
+
+  const strokeIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"];
+  const MAX_WRONG = strokeIds.length; // 7
+
+  /* ====================== State ====================== */
+  let mode = "normal";
+  let selected = null;
+  let display = [];
+  let wrongGuesses = 0;
+  let guessed = new Set();
+  let hintUsed = false;
+  let over = false;
+
+  /* ====================== Stats (localStorage) ====================== */
+  const STORE_KEY = "anime-hangman-stats-v1";
+  function loadStats() {
+    try {
+      return JSON.parse(localStorage.getItem(STORE_KEY)) || { games: 0, wins: 0, streak: 0, best: 0 };
+    } catch {
+      return { games: 0, wins: 0, streak: 0, best: 0 };
+    }
+  }
+  function saveStats(s) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch {}
+  }
+  let stats = loadStats();
+  function renderStats() {
+    statStreak.textContent = stats.streak;
+    statBest.textContent = stats.best;
+    statWins.textContent = stats.wins;
+    statGames.textContent = stats.games;
+  }
+  function recordResult(won) {
+    stats.games++;
+    if (won) {
+      stats.wins++;
+      stats.streak++;
+      stats.best = Math.max(stats.best, stats.streak);
+    } else {
+      stats.streak = 0;
+    }
+    saveStats(stats);
+    renderStats();
+  }
+
+  /* ====================== Sound (WebAudio, no assets) ====================== */
+  let soundOn = true;
+  let actx = null;
+  function ensureCtx() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    return actx;
+  }
+  function beep(freq, dur = 0.09, type = "sine", gain = 0.05) {
+    if (!soundOn) return;
+    try {
+      const ctx = ensureCtx();
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      g.gain.value = gain;
+      osc.connect(g).connect(ctx.destination);
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(gain, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      osc.start(now);
+      osc.stop(now + dur);
+    } catch {}
+  }
+  const sfx = {
+    correct: () => beep(660, 0.1, "triangle", 0.06),
+    wrong: () => beep(140, 0.18, "sawtooth", 0.05),
+    win: () => { beep(523, 0.12); setTimeout(() => beep(659, 0.12), 110); setTimeout(() => beep(784, 0.2), 220); },
+    lose: () => { beep(220, 0.25, "sawtooth", 0.05); setTimeout(() => beep(140, 0.35, "sawtooth", 0.05), 150); }
+  };
+  soundToggle.addEventListener("click", () => {
+    soundOn = !soundOn;
+    soundToggle.setAttribute("aria-pressed", String(soundOn));
+    soundToggle.style.opacity = soundOn ? "1" : "0.4";
+  });
+
+  /* ====================== Torii / life dots ====================== */
+  function buildLifeDots() {
+    lifeDots.innerHTML = "";
+    for (let i = 0; i < MAX_WRONG; i++) {
+      const s = document.createElement("span");
+      lifeDots.appendChild(s);
+    }
+  }
+  function renderTorii() {
+    strokeIds.forEach((id, i) => {
+      const el = $(id);
+      el.classList.toggle("drawn", i < wrongGuesses);
+    });
+    $("s7").classList.toggle("final-hit", wrongGuesses >= MAX_WRONG);
+    const dots = lifeDots.children;
+    const remaining = MAX_WRONG - wrongGuesses;
+    for (let i = 0; i < dots.length; i++) {
+      dots[i].classList.toggle("spent", i >= remaining);
+    }
+  }
+
+  /* ====================== Word helpers ====================== */
+  function maskTitle(title) {
+    return [...title].map((ch) => (/[a-z0-9]/i.test(ch) ? "_" : ch));
+  }
+  function truncate(s, n) {
+    if (!s) return "No synopsis available.";
+    return s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, "") + "…";
+  }
+
+  async function fetchAdvancedTitle() {
+    const res = await fetch(JIKAN_URL);
+    if (!res.ok) throw new Error("Jikan API error");
+    const json = await res.json();
+    const data = json.data;
+    const title = data.title_english || data.title || data.title_japanese;
+    if (!title) throw new Error("No title");
+    return { title, hint: truncate(data.synopsis, 170) };
+  }
+
+  async function pickWord() {
+    if (mode === "normal") {
+      return NORMAL_BANK[Math.floor(Math.random() * NORMAL_BANK.length)];
+    }
+    try {
+      return await fetchAdvancedTitle();
+    } catch {
+      return FALLBACK[Math.floor(Math.random() * FALLBACK.length)];
+    }
+  }
+
+  /* ====================== Rendering ====================== */
+  function renderWord() {
+    wordEl.innerHTML = "";
+    display.forEach((ch) => {
+      const span = document.createElement("span");
+      span.className = "letter" + (ch === " " ? " space" : "");
+      span.textContent = ch === "_" ? "" : ch;
+      if (ch !== "_") span.classList.add("revealed");
+      wordEl.appendChild(span);
+    });
+  }
+  function renderWrong() {
+    const answer = selected.title.toLowerCase();
+    const wrong = [...guessed].filter((l) => !answer.includes(l));
+    wrongRow.textContent = wrong.length ? `Missed: ${wrong.join(" ").toUpperCase()}` : "";
+  }
+  function setMessage(text, cls) {
+    msgEl.textContent = text;
+    msgEl.classList.remove("win", "lose");
+    if (cls) msgEl.classList.add(cls);
+  }
+
+  /* ====================== Keyboard ====================== */
+  function buildKeyboard() {
+    kbEl.innerHTML = "";
+    for (let i = 65; i <= 90; i++) {
+      const letter = String.fromCharCode(i).toLowerCase();
+      const btn = document.createElement("button");
+      btn.className = "key";
+      btn.textContent = letter;
+      btn.dataset.letter = letter;
+      btn.setAttribute("aria-label", `Guess letter ${letter}`);
+      btn.addEventListener("click", () => handleGuess(letter));
+      kbEl.appendChild(btn);
+    }
+  }
+  function keyEl(letter) {
+    return kbEl.querySelector(`button[data-letter="${letter}"]`);
+  }
+  function disableAllKeys() {
+    kbEl.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  }
+
+  /* ====================== Petals (win celebration) ====================== */
+  function launchPetals() {
+    const count = 26;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement("span");
+      p.className = "petal";
+      p.textContent = Math.random() > 0.5 ? "🌸" : "✿";
+      p.style.left = Math.random() * 100 + "vw";
+      p.style.setProperty("--dx", (Math.random() * 120 - 60) + "px");
+      p.style.setProperty("--rot", Math.random() * 360 + "deg");
+      p.style.animationDuration = 2.6 + Math.random() * 2 + "s";
+      p.style.fontSize = 14 + Math.random() * 14 + "px";
+      petalsHost.appendChild(p);
+      setTimeout(() => p.remove(), 5000);
+    }
+  }
+
+  /* ====================== Guess handling ====================== */
+  function handleGuess(letter) {
+    if (over || guessed.has(letter)) return;
+    guessed.add(letter);
+    const btn = keyEl(letter);
+
+    const answer = selected.title.toLowerCase();
+    if (answer.includes(letter)) {
+      [...answer].forEach((ch, i) => {
+        if (ch === letter) display[i] = selected.title[i];
+      });
+      renderWord();
+      if (btn) { btn.classList.add("correct"); btn.disabled = true; }
+      sfx.correct();
+
+      if (!display.includes("_")) {
+        over = true;
+        setMessage(`You win! It was “${titleCase(selected.title)}”`, "win");
+        disableAllKeys();
+        sfx.win();
+        launchPetals();
+        recordResult(true);
+      }
+    } else {
+      wrongGuesses++;
+      renderTorii();
+      renderWrong();
+      if (btn) { btn.classList.add("wrong"); btn.disabled = true; }
+      sfx.wrong();
+      playCard.classList.remove("shake");
+      void playCard.offsetWidth;
+      playCard.classList.add("shake");
+
+      if (wrongGuesses >= MAX_WRONG) {
+        over = true;
+        display = [...selected.title];
+        renderWord();
+        setMessage(`The gate is complete. It was “${titleCase(selected.title)}”`, "lose");
+        disableAllKeys();
+        sfx.lose();
+        recordResult(false);
+      }
+    }
+  }
+
+  function titleCase(s) {
+    return s.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  /* ====================== Hint ====================== */
+  function showHint() {
+    if (hintUsed || over || !selected) return;
+    hintUsed = true;
+    hintText.textContent = selected.hint;
+    hintBtn.disabled = true;
+  }
+  hintBtn.addEventListener("click", showHint);
+
+  /* ====================== New game ====================== */
+  async function newGame() {
+    over = true; // block input while loading
+    setMessage(mode === "advanced" ? "Fetching a title from the API…" : "Shuffling the title bank…");
+    hintText.textContent = "";
+    hintBtn.disabled = false;
+    wrongRow.textContent = "";
+    wrongGuesses = 0;
+    guessed = new Set();
+    hintUsed = false;
+    renderTorii();
+    buildKeyboard();
+
+    selected = await pickWord();
+    display = maskTitle(selected.title);
+    over = false;
+
+    renderWord();
+    renderWrong();
+    setMessage("Guess the anime title, letter by letter.");
+  }
+
+  /* ====================== Mode switching ====================== */
+  modeBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.mode === mode) return;
+      modeBtns.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); });
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      mode = btn.dataset.mode;
+      modeCaption.textContent = mode === "normal"
+        ? "Normal mode — curated title bank."
+        : "Live API mode — a fresh random title from Jikan (MyAnimeList) each round.";
+      newGame();
+    });
+  });
+
+  /* ====================== Global input ====================== */
+  window.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    if (/^[a-z]$/.test(key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      handleGuess(key);
+    }
+    if (e.ctrlKey && key === "h") {
+      e.preventDefault();
+      showHint();
+    }
+  });
+  resetBtn.addEventListener("click", newGame);
+
+  /* ====================== Boot ====================== */
+  buildLifeDots();
+  renderStats();
+  newGame();
+})();
+
+</script>
+</body>
+</html>
